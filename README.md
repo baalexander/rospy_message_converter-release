@@ -1,3 +1,26 @@
+## rospy_message_converter (lunar) - 0.5.0-0
+
+The packages in the `rospy_message_converter` repository were released into the `lunar` distro by running `/usr/bin/bloom-release rospy_message_converter --edit --rosdistro lunar` on `Thu, 17 Jan 2019 09:31:02 -0000`
+
+The `rospy_message_converter` package was released.
+
+Version of package(s) in repository `rospy_message_converter`:
+
+- upstream repository: https://github.com/uos/rospy_message_converter.git
+- release repository: unknown
+- rosdistro version: `null`
+- old version: `null`
+- new version: `0.5.0-0`
+
+Versions of tools used:
+
+- bloom version: `0.7.1`
+- catkin_pkg version: `0.4.10`
+- rosdep version: `0.14.0`
+- rosdistro version: `0.7.1`
+- vcstools version: `0.1.40`
+
+
 ## rospy_message_converter (kinetic) - 0.5.0-0
 
 The packages in the `rospy_message_converter` repository were released into the `kinetic` distro by running `/usr/bin/bloom-release rospy_message_converter --edit --rosdistro kinetic` on `Thu, 17 Jan 2019 09:23:21 -0000`
