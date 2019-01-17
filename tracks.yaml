@@ -63,9 +63,9 @@ tracks:
     name: rospy_message_converter
     patches: null
     release_inc: '1'
-    release_repo_url: https://github.com/baalexander/rospy_message_converter-release.git
+    release_repo_url: https://github.com/uos-gbp/rospy_message_converter-release.git
     release_tag: :{version}
     ros_distro: kinetic
     vcs_type: git
-    vcs_uri: https://github.com/baalexander/rospy_message_converter.git
+    vcs_uri: https://github.com/uos/rospy_message_converter.git
     version: :{auto}
