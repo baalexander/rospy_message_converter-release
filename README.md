@@ -1,3 +1,26 @@
+## rospy_message_converter (melodic) - 0.5.1-1
+
+The packages in the `rospy_message_converter` repository were released into the `melodic` distro by running `/usr/bin/bloom-release -y rospy_message_converter --ros-distro melodic` on `Mon, 25 May 2020 16:29:07 -0000`
+
+The `rospy_message_converter` package was released.
+
+Version of package(s) in repository `rospy_message_converter`:
+
+- upstream repository: https://github.com/uos/rospy_message_converter.git
+- release repository: https://github.com/uos-gbp/rospy_message_converter-release.git
+- rosdistro version: `0.5.0-0`
+- old version: `0.5.0-0`
+- new version: `0.5.1-1`
+
+Versions of tools used:
+
+- bloom version: `0.9.7`
+- catkin_pkg version: `0.4.20`
+- rosdep version: `0.19.0`
+- rosdistro version: `0.8.1`
+- vcstools version: `0.1.42`
+
+
 ## rospy_message_converter (kinetic) - 0.5.1-1
 
 The packages in the `rospy_message_converter` repository were released into the `kinetic` distro by running `/usr/bin/bloom-release -y rospy_message_converter --ros-distro kinetic` on `Mon, 25 May 2020 16:18:23 -0000`
