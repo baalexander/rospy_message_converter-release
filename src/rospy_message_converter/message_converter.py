@@ -62,7 +62,7 @@ ros_binary_types_regexp = re.compile(r'(uint8|char)\[[^\]]*\]')
 
 list_brackets = re.compile(r'\[[^\]]*\]')
 
-def convert_dictionary_to_ros_message(message_type, dictionary, kind='message'):
+def convert_dictionary_to_ros_message(message_type, dictionary, kind='message', strict_mode=True):
     """
     Takes in the message type and a Python dictionary and returns a ROS message.
 
@@ -97,7 +97,10 @@ def convert_dictionary_to_ros_message(message_type, dictionary, kind='message'):
         else:
             error_message = 'ROS message type "{0}" has no field named "{1}"'\
                 .format(message_type, field_name)
-            raise ValueError(error_message)
+            if strict_mode:
+                raise ValueError(error_message)
+            else:
+                rospy.logerr('{}! It will be ignored.'.format(error_message))
 
     return message
 
@@ -108,6 +111,8 @@ def _convert_to_ros_type(field_type, field_value):
         field_value = _convert_to_ros_time(field_type, field_value)
     elif field_type in ros_primitive_types:
         field_value = _convert_to_ros_primitive(field_type, field_value)
+    elif _is_field_type_a_primitive_array(field_type):
+        field_value = field_value
     elif _is_field_type_an_array(field_type):
         field_value = _convert_to_ros_array(field_type, field_value)
     else:
@@ -141,7 +146,8 @@ def _convert_to_ros_time(field_type, field_value):
     return time
 
 def _convert_to_ros_primitive(field_type, field_value):
-    if field_type == "string":
+    # std_msgs/msg/_String.py always calls encode() on python3, so don't do it here
+    if field_type == "string" and not python3:
         field_value = field_value.encode('utf-8')
     return field_value
 
@@ -172,6 +178,8 @@ def _convert_from_ros_type(field_type, field_value):
         field_value = _convert_from_ros_time(field_type, field_value)
     elif field_type in ros_primitive_types:
         field_value = field_value
+    elif _is_field_type_a_primitive_array(field_type):
+        field_value = list(field_value)
     elif _is_field_type_an_array(field_type):
         field_value = _convert_from_ros_array(field_type, field_value)
     else:
@@ -199,7 +207,7 @@ def is_ros_binary_type(field_type, field_value):
     return re.search(ros_binary_types_regexp, field_type) is not None
 
 def _convert_from_ros_binary(field_type, field_value):
-    field_value = base64.standard_b64encode(field_value)
+    field_value = base64.standard_b64encode(field_value).decode('utf-8')
     return field_value
 
 def _convert_from_ros_time(field_type, field_value):
@@ -207,9 +215,6 @@ def _convert_from_ros_time(field_type, field_value):
         'secs'  : field_value.secs,
         'nsecs' : field_value.nsecs
     }
-    return field_value
-
-def _convert_from_ros_primitive(field_type, field_value):
     return field_value
 
 def _convert_from_ros_array(field_type, field_value):
@@ -221,3 +226,7 @@ def _get_message_fields(message):
 
 def _is_field_type_an_array(field_type):
     return list_brackets.search(field_type) is not None
+
+def _is_field_type_a_primitive_array(field_type):
+    list_type = list_brackets.sub('', field_type)
+    return list_type in ros_primitive_types
