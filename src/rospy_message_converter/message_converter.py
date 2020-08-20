@@ -33,54 +33,49 @@
 
 import roslib.message
 import rospy
-import re
 import base64
 import sys
 import copy
-python3 = True if sys.hexversion > 0x03000000 else False
-python_to_ros_type_map = {
-    'bool'    : ['bool'],
-    'int'     : ['int8', 'byte', 'uint8', 'char',
-                 'int16', 'uint16', 'int32', 'uint32',
-                 'int64', 'uint64', 'float32', 'float64'],
-    'float'   : ['float32', 'float64'],
-    'str'     : ['string'],
-    'unicode' : ['string'],
-    'long'    : ['uint64']
-}
-ros_to_python_type_map = {
-    'bool'    : ['bool'],
-    'byte'    : ['int'],
-    'char'    : ['int'],
-    'float32' : ['int', 'float'],
-    'float64' : ['int', 'float'],
-    'int16'   : ['int'],
-    'int32'   : ['int'],
-    'int64'   : ['int'],
-    'int8'    : ['int'],
-    'string'  : ['str', 'unicode'],
-    'uint16'  : ['int'],
-    'uint32'  : ['int'],
-    'uint64'  : ['int', 'long'],
-    'uint8'   : ['int']
-}
+import numpy as np
+
+python3 = (sys.hexversion > 0x03000000)
+
+python_list_types = [list, tuple]
 
 if python3:
     python_string_types = [str]
+    python_int_types = [int]
 else:
     python_string_types = [str, unicode]
-python_list_types = [list, tuple]
+    python_int_types = [int, long]
+
+python_float_types = [float]
+
+ros_to_python_type_map = {
+    'bool'    : [bool],
+    'float32' : python_float_types + python_int_types + [np.float32, np.int8, np.int16, np.uint8, np.uint16],
+       # don't include int32, because conversion to float may change value: v = np.iinfo(np.int32).max; np.float32(v) != v
+    'float64' : python_float_types + python_int_types + [np.float32, np.float64, np.int8, np.int16, np.int32, np.uint8, np.uint16, np.uint32],
+    'int8'    : python_int_types + [np.int8],
+    'int16'   : python_int_types + [np.int8, np.int16, np.uint8],
+    'int32'   : python_int_types + [np.int8, np.int16, np.int32, np.uint8, np.uint16],
+    'int64'   : python_int_types + [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32],
+    'uint8'   : python_int_types + [np.uint8],
+    'uint16'  : python_int_types + [np.uint8, np.uint16],
+    'uint32'  : python_int_types + [np.uint8, np.uint16, np.uint32],
+    'uint64'  : python_int_types + [np.uint8, np.uint16, np.uint32, np.uint64],
+    'byte'    : python_int_types + [np.int8],
+    'char'    : python_int_types + [np.uint8],
+    'string'  : python_string_types
+}
 
 ros_time_types = ['time', 'duration']
 ros_primitive_types = ['bool', 'byte', 'char', 'int8', 'uint8', 'int16',
                        'uint16', 'int32', 'uint32', 'int64', 'uint64',
                        'float32', 'float64', 'string']
 ros_header_types = ['Header', 'std_msgs/Header', 'roslib/Header']
-ros_binary_types_regexp = re.compile(r'(uint8|char)\[[^\]]*\]')
 
-list_brackets = re.compile(r'\[[^\]]*\]')
-
-def convert_dictionary_to_ros_message(message_type, dictionary, kind='message', strict_mode=True, check_missing_fields=False):
+def convert_dictionary_to_ros_message(message_type, dictionary, kind='message', strict_mode=True, check_missing_fields=False, check_types=True):
     """
     Takes in the message type and a Python dictionary and returns a ROS message.
 
@@ -112,7 +107,7 @@ def convert_dictionary_to_ros_message(message_type, dictionary, kind='message', 
     for field_name, field_value in dictionary.items():
         if field_name in message_fields:
             field_type = message_fields[field_name]
-            field_value = _convert_to_ros_type(field_type, field_value)
+            field_value = _convert_to_ros_type(field_name, field_type, field_value, check_types)
             setattr(message, field_name, field_value)
             del remaining_message_fields[field_name]
         else:
@@ -129,19 +124,23 @@ def convert_dictionary_to_ros_message(message_type, dictionary, kind='message', 
 
     return message
 
-def _convert_to_ros_type(field_type, field_value):
-    if is_ros_binary_type(field_type, field_value):
+def _convert_to_ros_type(field_name, field_type, field_value, check_types=True):
+    if _is_ros_binary_type(field_type):
         field_value = _convert_to_ros_binary(field_type, field_value)
     elif field_type in ros_time_types:
         field_value = _convert_to_ros_time(field_type, field_value)
     elif field_type in ros_primitive_types:
-        if type(field_value).__name__ not in ros_to_python_type_map[field_type]:
-            raise TypeError("Wrong type: '{0}' must be {1}".format(field_value, field_type))
+        # Note: one could also use genpy.message.check_type() here, but:
+        # 1. check_type is "not designed to run fast and is meant only for error diagnosis"
+        # 2. it doesn't check floats (see ros/genpy#130)
+        # 3. it rejects numpy types, although they can be serialized
+        if check_types and type(field_value) not in ros_to_python_type_map[field_type]:
+            raise TypeError("Field '{0}' has wrong type {1} (valid types: {2})".format(field_name, type(field_value), ros_to_python_type_map[field_type]))
         field_value = _convert_to_ros_primitive(field_type, field_value)
     elif _is_field_type_a_primitive_array(field_type):
         field_value = field_value
     elif _is_field_type_an_array(field_type):
-        field_value = _convert_to_ros_array(field_type, field_value)
+        field_value = _convert_to_ros_array(field_name, field_type, field_value, check_types)
     else:
         field_value = convert_dictionary_to_ros_message(field_type, field_value)
 
@@ -150,9 +149,10 @@ def _convert_to_ros_type(field_type, field_value):
 def _convert_to_ros_binary(field_type, field_value):
     if type(field_value) in python_string_types:
         binary_value_as_string = base64.standard_b64decode(field_value)
+    elif python3:
+        binary_value_as_string = bytes(bytearray(field_value))
     else:
         binary_value_as_string = str(bytearray(field_value))
-
     return binary_value_as_string
 
 def _convert_to_ros_time(field_type, field_value):
@@ -178,9 +178,10 @@ def _convert_to_ros_primitive(field_type, field_value):
         field_value = field_value.encode('utf-8')
     return field_value
 
-def _convert_to_ros_array(field_type, list_value):
-    list_type = list_brackets.sub('', field_type)
-    return [_convert_to_ros_type(list_type, value) for value in list_value]
+def _convert_to_ros_array(field_name, field_type, list_value, check_types=True):
+    # use index to raise ValueError if '[' not present
+    list_type = field_type[:field_type.index('[')]
+    return [_convert_to_ros_type(field_name, list_type, value, check_types) for value in list_value]
 
 def convert_ros_message_to_dictionary(message):
     """
@@ -199,12 +200,12 @@ def convert_ros_message_to_dictionary(message):
     return dictionary
 
 def _convert_from_ros_type(field_type, field_value):
-    if is_ros_binary_type(field_type, field_value):
-        field_value = _convert_from_ros_binary(field_type, field_value)
+    if field_type in ros_primitive_types:
+        field_value = field_value
     elif field_type in ros_time_types:
         field_value = _convert_from_ros_time(field_type, field_value)
-    elif field_type in ros_primitive_types:
-        field_value = field_value
+    elif _is_ros_binary_type(field_type):
+        field_value = _convert_from_ros_binary(field_type, field_value)
     elif _is_field_type_a_primitive_array(field_type):
         field_value = list(field_value)
     elif _is_field_type_an_array(field_type):
@@ -214,23 +215,23 @@ def _convert_from_ros_type(field_type, field_value):
 
     return field_value
 
-def is_ros_binary_type(field_type, field_value):
+def _is_ros_binary_type(field_type):
     """ Checks if the field is a binary array one, fixed size or not
 
-    is_ros_binary_type("uint8", 42)
+    _is_ros_binary_type("uint8")
     >>> False
-    is_ros_binary_type("uint8[]", [42, 18])
+    _is_ros_binary_type("uint8[]")
     >>> True
-    is_ros_binary_type("uint8[3]", [42, 18, 21]
+    _is_ros_binary_type("uint8[3]")
     >>> True
-    is_ros_binary_type("char", 42)
+    _is_ros_binary_type("char")
     >>> False
-    is_ros_binary_type("char[]", [42, 18])
+    _is_ros_binary_type("char[]")
     >>> True
-    is_ros_binary_type("char[3]", [42, 18, 21]
+    _is_ros_binary_type("char[3]")
     >>> True
     """
-    return re.search(ros_binary_types_regexp, field_type) is not None
+    return field_type.startswith('uint8[') or field_type.startswith('char[')
 
 def _convert_from_ros_binary(field_type, field_value):
     field_value = base64.standard_b64encode(field_value).decode('utf-8')
@@ -244,15 +245,20 @@ def _convert_from_ros_time(field_type, field_value):
     return field_value
 
 def _convert_from_ros_array(field_type, field_value):
-    list_type = list_brackets.sub('', field_type)
+    # use index to raise ValueError if '[' not present
+    list_type = field_type[:field_type.index('[')]
     return [_convert_from_ros_type(list_type, value) for value in field_value]
 
 def _get_message_fields(message):
     return zip(message.__slots__, message._slot_types)
 
 def _is_field_type_an_array(field_type):
-    return list_brackets.search(field_type) is not None
+    return field_type.find('[') >= 0
 
 def _is_field_type_a_primitive_array(field_type):
-    list_type = list_brackets.sub('', field_type)
-    return list_type in ros_primitive_types
+    bracket_index = field_type.find('[')
+    if bracket_index < 0:
+        return False
+    else:
+        list_type = field_type[:bracket_index]
+        return list_type in ros_primitive_types
