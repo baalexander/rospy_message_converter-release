@@ -43,7 +43,7 @@ python3 = (sys.hexversion > 0x03000000)
 python_list_types = [list, tuple]
 
 if python3:
-    python_string_types = [str]
+    python_string_types = [str, bytes]
     python_int_types = [int]
 else:
     python_string_types = [str, unicode]
@@ -174,11 +174,17 @@ def _convert_to_ros_type(field_name, field_type, field_value, check_types=True):
 
 def _convert_to_ros_binary(field_type, field_value):
     if type(field_value) in python_string_types:
-        binary_value_as_string = base64.standard_b64decode(field_value)
-    elif python3:
-        binary_value_as_string = bytes(bytearray(field_value))
+        if python3:
+            # base64 in python3 added the `validate` arg:
+            # If field_value is not properly base64 encoded and there are non-base64-alphabet characters in the input,
+            # a binascii.Error will be raised.
+            binary_value_as_string = base64.b64decode(field_value, validate=True)
+        else:
+            # base64 in python2 doesn't have the `validate` arg: characters that are not in the base-64 alphabet are
+            # silently discarded, resulting in garbage output.
+            binary_value_as_string = base64.b64decode(field_value)
     else:
-        binary_value_as_string = str(bytearray(field_value))
+        binary_value_as_string = bytes(bytearray(field_value))
     return binary_value_as_string
 
 def _convert_to_ros_time(field_type, field_value):
@@ -227,7 +233,7 @@ def convert_ros_message_to_dictionary(message):
 
 def _convert_from_ros_type(field_type, field_value):
     if field_type in ros_primitive_types:
-        field_value = field_value
+        field_value = _convert_from_ros_primitive(field_type, field_value)
     elif field_type in ros_time_types:
         field_value = _convert_from_ros_time(field_type, field_value)
     elif _is_ros_binary_type(field_type):
@@ -260,7 +266,7 @@ def _is_ros_binary_type(field_type):
     return field_type.startswith('uint8[') or field_type.startswith('char[')
 
 def _convert_from_ros_binary(field_type, field_value):
-    field_value = base64.standard_b64encode(field_value).decode('utf-8')
+    field_value = base64.b64encode(field_value).decode('utf-8')
     return field_value
 
 def _convert_from_ros_time(field_type, field_value):
@@ -268,6 +274,12 @@ def _convert_from_ros_time(field_type, field_value):
         'secs'  : field_value.secs,
         'nsecs' : field_value.nsecs
     }
+    return field_value
+
+def _convert_from_ros_primitive(field_type, field_value):
+    # std_msgs/msg/_String.py always calls decode() on python3, so don't do it here
+    if field_type == "string" and not python3:
+        field_value = field_value.decode('utf-8')
     return field_value
 
 def _convert_from_ros_array(field_type, field_value):
