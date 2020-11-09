@@ -13,6 +13,14 @@ class TestJsonMessageConverter(unittest.TestCase):
         returned_json = json_message_converter.convert_ros_message_to_json(message)
         self.assertEqual(returned_json, expected_json)
 
+    def test_ros_message_with_string_unicode(self):
+        from std_msgs.msg import String
+        expected_json = '{"data": "Hello \\u00dcnicode"}'
+        message = String(data = u'Hello \u00dcnicode')
+        message = serialize_deserialize(message)
+        returned_json = json_message_converter.convert_ros_message_to_json(message)
+        self.assertEqual(returned_json, expected_json)
+
     def test_ros_message_with_header(self):
         from std_msgs.msg import Header
         from time import time
@@ -33,7 +41,7 @@ class TestJsonMessageConverter(unittest.TestCase):
     def test_ros_message_with_uint8_array(self):
         from rospy_message_converter.msg import Uint8ArrayTestMessage
         input_data = [97, 98, 99, 100]
-        expected_json = '{"data": "YWJjZA=="}'  # base64.standard_b64encode("abcd") is "YWJjZA=="
+        expected_json = '{"data": "YWJjZA=="}'  # base64.b64encode("abcd") is "YWJjZA=="
         message = Uint8ArrayTestMessage(data=input_data)
         message = serialize_deserialize(message)
         returned_json = json_message_converter.convert_ros_message_to_json(message)
@@ -42,7 +50,7 @@ class TestJsonMessageConverter(unittest.TestCase):
     def test_ros_message_with_3uint8_array(self):
         from rospy_message_converter.msg import Uint8Array3TestMessage
         input_data = [97, 98, 99]
-        expected_json = '{"data": "YWJj"}'  # base64.standard_b64encode("abc") is "YWJj"
+        expected_json = '{"data": "YWJj"}'  # base64.b64encode("abc") is "YWJj"
         message = Uint8Array3TestMessage(data=input_data)
         message = serialize_deserialize(message)
         returned_json = json_message_converter.convert_ros_message_to_json(message)
@@ -52,6 +60,14 @@ class TestJsonMessageConverter(unittest.TestCase):
         from std_msgs.msg import String
         expected_message = String(data = 'Hello')
         json_str = '{"data": "Hello"}'
+        message = json_message_converter.convert_json_to_ros_message('std_msgs/String', json_str)
+        expected_message = serialize_deserialize(expected_message)
+        self.assertEqual(message, expected_message)
+
+    def test_json_with_string_unicode(self):
+        from std_msgs.msg import String
+        expected_message = String(data = u'Hello \u00dcnicode')
+        json_str = '{"data": "Hello \\u00dcnicode"}'
         message = json_message_converter.convert_json_to_ros_message('std_msgs/String', json_str)
         expected_message = serialize_deserialize(expected_message)
         self.assertEqual(message, expected_message)
