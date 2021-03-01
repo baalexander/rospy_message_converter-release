@@ -7,9 +7,16 @@ find_package(catkin REQUIRED COMPONENTS message_generation std_msgs)
 # Generate messages for testing (NOINSTALL)
 add_message_files(
   FILES
+  NestedUint8ArrayTestMessage.msg
   TestArray.msg
   Uint8Array3TestMessage.msg
   Uint8ArrayTestMessage.msg
+  NOINSTALL
+)
+
+add_service_files(
+  FILES
+  NestedUint8ArrayTestService.srv
   NOINSTALL
 )
 
